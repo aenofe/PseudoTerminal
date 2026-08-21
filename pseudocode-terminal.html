@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pseudocode / terminal</title>
+<script src="pyodide_runtime/pyodide.js"></script>
+<style>
+  :root {
+    --bg: #eae9e3;
+    --panel: #f2f1ec;
+    --panel-header: #dedcd3;
+    --border: #c8c6bb;
+    --text: #3c3b36;
+    --text-dim: #86847a;
+    --accent: #6f8f74;
+    --accent-text: #f2f1ec;
+    --caret: #6f8f74;
+    --shadow: rgba(60, 59, 54, 0.06);
+  }
+
+  html[data-theme="dark"] {
+    --bg: #1d201d;
+    --panel: #24271f00;
+    --panel: #23261f;
+    --panel-header: #2b2e27;
+    --border: #383b33;
+    --text: #c6c4b8;
+    --text-dim: #75766c;
+    --accent: #6d8b73;
+    --accent-text: #1d201d;
+    --caret: #6d8b73;
+    --shadow: rgba(0, 0, 0, 0.25);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    transition: background 0.25s ease, color 0.25s ease;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  header h1 {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin: 0;
+  }
+
+  .theme-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--panel-header);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .theme-toggle span {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    padding: 5px 10px;
+    border-radius: 999px;
+    color: var(--text-dim);
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+
+  .theme-toggle span.active {
+    background: var(--accent);
+    color: var(--accent-text);
+  }
+
+  main {
+    flex: 1;
+    display: flex;
+    gap: 22px;
+    padding: 26px 28px 34px;
+  }
+
+  .column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px var(--shadow);
+  }
+
+  .panel-label {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    background: var(--panel-header);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  textarea, .terminal-output {
+    flex: 1;
+    width: 100%;
+    border: none;
+    outline: none;
+    resize: none;
+    background: transparent;
+    color: var(--text);
+    font-family: "Courier New", Courier, monospace;
+    font-size: 13.5px;
+    line-height: 1.6;
+    padding: 16px;
+  }
+
+  textarea::placeholder {
+    color: var(--text-dim);
+    opacity: 0.7;
+  }
+
+  .terminal-output {
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .terminal-output .line { color: var(--text); }
+  .terminal-output .echo { color: var(--text-dim); }
+  .terminal-output .cursor {
+    display: inline-block;
+    width: 7px;
+    height: 13px;
+    background: var(--caret);
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: blink 1s steps(1) infinite;
+  }
+
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+
+  .run-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: 12px;
+  }
+
+  .note {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-style: italic;
+    margin: 0;
+  }
+
+  .run-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent);
+    color: var(--accent-text);
+    border: none;
+    border-radius: 5px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: filter 0.15s ease, transform 0.05s ease;
+  }
+
+  .run-btn:hover { filter: brightness(1.06); }
+  .run-btn:active { transform: translateY(1px); }
+
+  .run-btn svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  @media (max-width: 720px) {
+    main { flex-direction: column; }
+  }
+
+  .info-badge {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--panel-header);
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 13px;
+    font-style: italic;
+    font-weight: 700;
+    cursor: default;
+    user-select: none;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .info-badge:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .info-badge .tooltip {
+    position: absolute;
+    bottom: 34px;
+    right: 0;
+    background: var(--panel-header);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 11.5px;
+    line-height: 1.5;
+    white-space: pre;
+    padding: 8px 12px;
+    border-radius: 5px;
+    box-shadow: 0 2px 6px var(--shadow);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    pointer-events: none;
+  }
+
+  .info-badge:hover .tooltip,
+  .info-badge.open .tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+
+  .info-badge { cursor: pointer; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>pseudocode &nbsp;/&nbsp; terminal</h1>
+  <div class="theme-toggle" id="themeToggle">
+    <span id="lightLabel">light</span>
+    <span id="darkLabel">dark</span>
+  </div>
+</header>
+
+<main>
+  <div class="column">
+    <div class="panel">
+      <div class="panel-label">PSEUDOCODE:</div>
+      <textarea id="pseudocode" placeholder="start typing your pseudocode..." spellcheck="false"></textarea>
+    </div>
+    <div class="run-row">
+      <p class="note">*Please check your pseudocode carefully.</p>
+      <button class="run-btn" id="runBtn">
+        run
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+          <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="column">
+    <div class="panel">
+      <div class="panel-label">TERMINAL:</div>
+      <div class="terminal-output" id="terminal"><span class="echo">$ waiting for input</span><span class="cursor"></span></div>
+    </div>
+  </div>
+</main>
+
+<div class="info-badge" id="infoBadge">i
+  <div class="tooltip">Made by Orish
+Project started in August 2026</div>
+</div>
+
+<script>
+  const root = document.documentElement;
+  const lightLabel = document.getElementById('lightLabel');
+  const darkLabel = document.getElementById('darkLabel');
+  const toggle = document.getElementById('themeToggle');
+
+  function setTheme(theme) {
+    root.setAttribute('data-theme', theme);
+    lightLabel.classList.toggle('active', theme === 'light');
+    darkLabel.classList.toggle('active', theme === 'dark');
+  }
+
+  setTheme('light');
+
+  toggle.addEventListener('click', () => {
+    const current = root.getAttribute('data-theme');
+    setTheme(current === 'light' ? 'dark' : 'light');
+  });
+
+  const runBtn = document.getElementById('runBtn');
+  const pseudocode = document.getElementById('pseudocode');
+  const terminal = document.getElementById('terminal');
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function setTerminal(htmlBody) {
+    terminal.innerHTML = htmlBody + '<span class="cursor"></span>';
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+
+  function echoLine(text) {
+    return '<span class="echo">' + esc(text) + '</span>\n';
+  }
+
+  // The transpiler itself, running as real Python inside the browser.
+  const TRANSPILER_PY = `
+import re
+
+def transpile(source):
+    types = ('INTEGER', 'STRING', 'REAL', 'BOOLEAN', 'CHAR')
+    gbl = {}
+    forstack = []
+    casefirst = False
+    caseind = 0
+
+    def pyval(v):
+        if isinstance(v, str):
+            return repr(v)
+        return str(v)
+
+    def translate_expr(expr):
+        e = ' ' + expr.strip() + ' '
+        e = e.replace('<>', '!=')
+        e = re.sub(r'\\bMOD\\b', '%', e)
+        e = re.sub(r'\\bDIV\\b', '//', e)
+        e = re.sub(r'\\bAND\\b', 'and', e)
+        e = re.sub(r'\\bOR\\b', 'or', e)
+        e = re.sub(r'\\bNOT\\b', 'not', e)
+        e = re.sub(r'\\bTRUE\\b', 'True', e)
+        e = re.sub(r'\\bFALSE\\b', 'False', e)
+        e = e.replace(' & ', ' + ')
+        out = []
+        i = 0
+        while i < len(e):
+            if e[i] == '=' and (i == 0 or e[i-1] not in '<>=!') and (i+1 >= len(e) or e[i+1] != '='):
+                out.append('==')
+            else:
+                out.append(e[i])
+            i += 1
+        return ''.join(out).strip()
+
+    out = []
+    for raw_line in source.split('\\n'):
+        l1 = len(raw_line)
+        l2 = len(raw_line.lstrip())
+        ind = l1 - l2
+        line = raw_line.strip()
+
+        if line == '' or line.startswith('//'):
+            continue
+
+        if line.startswith('DECLARE '):
+            body = line[len('DECLARE '):].replace(' ', '')
+            if body.endswith(types):
+                try:
+                    var, vtype = body.split(':')
+                except ValueError:
+                    out.append((0, "# ERROR: missing ':' in DECLARE"))
+                    continue
+                default = {'INTEGER': 0, 'STRING': '', 'REAL': 0.0, 'BOOLEAN': False, 'CHAR': ''}[vtype]
+                for v in var.split(','):
+                    gbl[v] = default
+                    out.append((ind, f'{v} = {pyval(default)}'))
+            else:
+                out.append((0, "# ERROR: unknown data type in DECLARE"))
+
+        elif line.startswith('CONSTANT '):
+            name, val = line[len('CONSTANT '):].split('=', 1)
+            name = name.strip()
+            val = translate_expr(val)
+            gbl.setdefault(name, 0)
+            out.append((ind, f'{name} = {val}'))
+
+        elif line.startswith('OUTPUT '):
+            writer = line[len('OUTPUT '):]
+            out.append((ind, f'print({writer})'))
+
+        elif line.startswith('INPUT '):
+            writer = line[len('INPUT '):].strip()
+            if writer in gbl:
+                t = type(gbl[writer])
+                if t == int:
+                    out.append((ind, f'{writer} = int(input())'))
+                elif t == float:
+                    out.append((ind, f'{writer} = float(input())'))
+                elif t == bool:
+                    out.append((ind, f'{writer} = input().strip().upper() == "TRUE"'))
+                else:
+                    out.append((ind, f'{writer} = input()'))
+
+        elif line.startswith('FOR '):
+            body = line[len('FOR '):]
+            runvar, val = body.split('<-')
+            runvar = runvar.strip()
+            val = val.strip()
+            inc = '1'
+            if ' STEP ' in val:
+                val, inc = val.split(' STEP ')
+                inc = inc.strip()
+            start, end = val.split(' TO ')
+            start = start.strip()
+            end = end.strip()
+            gbl[runvar] = 0
+            forstack.append((runvar, inc, ind))
+            out.append((ind, f'{runvar} = {start}'))
+            out.append((ind, f'while {runvar} <= {end}:'))
+
+        elif line.startswith('NEXT'):
+            runvar, inc, forind = forstack.pop()
+            out.append((forind + 4, f'{runvar} += {inc}'))
+
+        elif line.startswith('WHILE ') and line.endswith(' DO'):
+            cond = line[len('WHILE '):-len(' DO')]
+            out.append((ind, f'while {translate_expr(cond)}:'))
+
+        elif line == 'ENDWHILE':
+            pass
+
+        elif line == 'REPEAT':
+            out.append((ind, 'while True:'))
+
+        elif line.startswith('UNTIL '):
+            cond = line[len('UNTIL '):]
+            out.append((ind + 4, f'if {translate_expr(cond)}:'))
+            out.append((ind + 8, 'break'))
+
+        elif line.startswith('IF ') and line.endswith('THEN'):
+            cond = line[len('IF '):-len('THEN')]
+            out.append((ind, f'if {translate_expr(cond)}:'))
+
+        elif line.startswith('ELSE'):
+            out.append((ind, 'else:'))
+
+        elif line == 'ENDIF':
+            pass
+
+        elif line.startswith('CASE OF '):
+            casevar = line[len('CASE OF '):].strip()
+            caseind = ind
+            out.append((caseind, f'_case_val = {casevar}'))
+            casefirst = True
+
+        elif line.startswith('OTHERWISE'):
+            out.append((caseind, 'else:'))
+            rest = line[len('OTHERWISE'):].lstrip(':').strip()
+            if rest.startswith('OUTPUT '):
+                out.append((caseind + 4, f'print({rest[len("OUTPUT "):]})'))
+            elif rest:
+                out.append((caseind + 4, translate_expr(rest)))
+
+        elif line == 'ENDCASE':
+            pass
+
+        elif casefirst is not False and ':' in line and '<-' not in line:
+            val, stmt = line.split(':', 1)
+            val = val.strip()
+            stmt = stmt.strip()
+            kw = 'if' if casefirst is True else 'elif'
+            casefirst = 'used'
+            out.append((caseind, f'{kw} _case_val == {val}:'))
+            if stmt.startswith('OUTPUT '):
+                out.append((caseind + 4, f'print({stmt[len("OUTPUT "):]})'))
+            else:
+                out.append((caseind + 4, translate_expr(stmt)))
+
+        elif line.startswith('PROCEDURE '):
+            header = line[len('PROCEDURE '):]
+            name, params = (header.split('(', 1) + [''])[:2]
+            params = params.rstrip(')')
+            pnames = [p.split(':')[0].strip() for p in params.split(',') if p.strip()]
+            out.append((ind, f'def {name.strip()}({", ".join(pnames)}):'))
+
+        elif line == 'ENDPROCEDURE':
+            pass
+
+        elif line.startswith('CALL '):
+            out.append((ind, line[len('CALL '):]))
+
+        elif line.startswith('FUNCTION '):
+            header = line[len('FUNCTION '):].split(' RETURNS')[0]
+            name, params = (header.split('(', 1) + [''])[:2]
+            params = params.rstrip(')')
+            pnames = [p.split(':')[0].strip() for p in params.split(',') if p.strip()]
+            out.append((ind, f'def {name.strip()}({", ".join(pnames)}):'))
+
+        elif line == 'ENDFUNCTION':
+            pass
+
+        elif line.startswith('RETURN '):
+            out.append((ind, f'return {line[len("RETURN "):]}'))
+
+        elif line.startswith(tuple(gbl.keys())) and '<-' in line:
+            varname, value = line.split('<-')
+            varname = varname.strip()
+            value = translate_expr(value)
+            if varname in gbl:
+                out.append((ind, f'{varname} = {value}'))
+
+    return '\\n'.join(' ' * i + c for i, c in out) + '\\n'
+`;
+
+  let pyodideReady = null;
+
+  async function boot() {
+    setTerminal(echoLine('$ loading python runtime...'));
+    runBtn.disabled = true;
+
+    const pyodide = await loadPyodide({ indexURL: 'pyodide_runtime/' });
+    pyodide.runPython(TRANSPILER_PY);
+
+    // Route Python's input() to a real browser prompt so INPUT works offline.
+    pyodide.globals.set('js_prompt', (msg) => window.prompt(msg || ''));
+    pyodide.runPython(`
+import builtins
+builtins.input = lambda prompt='': js_prompt(prompt)
+`);
+
+    runBtn.disabled = false;
+    setTerminal(echoLine('$ ready — type some pseudocode and hit run'));
+    return pyodide;
+  }
+
+  pyodideReady = boot();
+
+  runBtn.addEventListener('click', async () => {
+    const source = pseudocode.value;
+    runBtn.disabled = true;
+
+    let body = echoLine('$ running pseudocode...');
+    setTerminal(body);
+
+    try {
+      const pyodide = await pyodideReady;
+      const transpile = pyodide.globals.get('transpile');
+      const generated = transpile(source);
+
+      pyodide.setStdout({ batched: (msg) => {
+        body += '<span class="line">' + esc(msg) + '</span>\n';
+        setTerminal(body);
+      }});
+      pyodide.setStderr({ batched: (msg) => {
+        body += '<span class="line">' + esc(msg) + '</span>\n';
+        setTerminal(body);
+      }});
+
+      pyodide.runPython(generated);
+
+      body += echoLine('process exited (code 0)');
+      setTerminal(body);
+    } catch (err) {
+      body += '<span class="line">' + esc(String(err)) + '</span>\n';
+      body += echoLine('process exited (code 1)');
+      setTerminal(body);
+    } finally {
+      runBtn.disabled = false;
+    }
+  });
+
+  const infoBadge = document.getElementById('infoBadge');
+  infoBadge.addEventListener('click', (e) => {
+    e.stopPropagation();
+    infoBadge.classList.toggle('open');
+  });
+  document.addEventListener('click', () => {
+    infoBadge.classList.remove('open');
+  });
+</script>
+
+</body>
+</html>
